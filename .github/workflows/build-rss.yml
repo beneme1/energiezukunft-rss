@@ -1,0 +1,67 @@
+name: RSS-Feed erstellen und veröffentlichen
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # Alle sechs Stunden, jeweils 17 Minuten nach der vollen Stunde.
+    # GitHub verwendet bei cron UTC.
+    - cron: "17 */6 * * *"
+
+  push:
+    branches:
+      - main
+    paths:
+      - "generate_feed.py"
+      - "requirements.txt"
+      - ".github/workflows/build-rss.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Python-Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: RSS-Datei erzeugen
+        run: python generate_feed.py
+
+      - name: GitHub Pages konfigurieren
+        uses: actions/configure-pages@v5
+
+      - name: Pages-Artefakt hochladen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "./public"
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Auf GitHub Pages veröffentlichen
+        id: deployment
+        uses: actions/deploy-pages@v4
